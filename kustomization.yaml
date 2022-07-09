@@ -3,6 +3,7 @@ kind: Kustomization
 namespace: todo-namespace
 resources:
   - manifests/deployment.yaml
+  - manifests/analysistemplate.yaml
   - manifests/service.yaml
   - manifests/daily-todo.yaml
   - manifests/image-volume-claim.yaml
