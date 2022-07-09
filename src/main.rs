@@ -54,6 +54,7 @@ async fn main() {
     let app = Router::new()
         .route("/image", get_service(ServeFile::new(format!("{}/image.jpg", image_storage_path))).handle_error(handle_error))
         .route("/todos", get(get_todos).post(post_todo))
+        .route("/health", get(health_check))
         .route("/", get(index_page).post(post_todo_form))
         .layer(Extension(image_storage))
         .layer(Extension(image_age))
@@ -176,4 +177,16 @@ async fn download_image_of_the_day(image_dir: Arc<String>) {
 
 async fn handle_error(_err: std::io::Error) -> impl IntoResponse {
     (StatusCode::INTERNAL_SERVER_ERROR, "Something went wrong...")
+}
+
+// This functions as both a liveness and readiness check
+// because the program will keep crashing until database is ready
+async fn health_check(
+    Extension(pool): Extension<PgPool>
+) -> Result<String, StatusCode> {
+    if pool.is_closed() {
+        Err(StatusCode::INTERNAL_SERVER_ERROR)
+    } else {
+        Ok("Alive".to_string())
+    }
 }
