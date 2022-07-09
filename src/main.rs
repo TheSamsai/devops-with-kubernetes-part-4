@@ -1,8 +1,8 @@
 use std::{net::SocketAddr, time::Instant, sync::Arc};
 
 use axum::{
-    routing::{get, get_service},
-    Router, response::{IntoResponse, Html, Redirect}, http::StatusCode, Extension, extract::Form, Json,
+    routing::{get, get_service, put, post},
+    Router, response::{IntoResponse, Html, Redirect}, http::StatusCode, Extension, extract::{Form, Path}, Json,
 };
 
 use serde::Deserialize;
@@ -53,7 +53,8 @@ async fn main() {
 
     let app = Router::new()
         .route("/image", get_service(ServeFile::new(format!("{}/image.jpg", image_storage_path))).handle_error(handle_error))
-        .route("/todos", get(get_todos).post(post_todo))
+        .route("/todos", get(get_todos).post(post_todo).put(put_todo))
+        .route("/mark/:id", post(toggle_todo_status))
         .route("/health", get(health_check))
         .route("/", get(index_page).post(post_todo_form))
         .layer(Extension(image_storage))
@@ -77,7 +78,8 @@ async fn initialize_database(pool: &PgPool) {
 CREATE TABLE IF NOT EXISTS todos
 (
     id   BIGSERIAL PRIMARY KEY,
-    text TEXT NOT NULL
+    text TEXT NOT NULL,
+    done BOOLEAN DEFAULT FALSE
 );
         "#
     )
@@ -111,7 +113,7 @@ async fn post_todo_form(
     Form(input): Form<TodoInput>,
     Extension(pool): Extension<PgPool>
 ) -> Redirect {
-    let todo = Todo { id: 0, text: input.todo };
+    let todo = Todo { id: 0, text: input.todo, done: false };
 
     if todo.text.len() > 140 {
         println!("Todo too long: {}", todo.text);
@@ -122,6 +124,20 @@ async fn post_todo_form(
     todo.create(&pool).await;
 
     println!("Todo added via form");
+
+    Redirect::to("/")
+}
+
+async fn toggle_todo_status(
+    Path(todo_id): Path<i64>,
+    Extension(pool): Extension<PgPool>
+) -> Redirect {
+    if let Some(mut todo) = Todo::get_by_id(&pool, todo_id).await {
+        todo.done = !todo.done;
+        todo.update(&pool).await;
+    }
+
+    println!("Todo status toggled via form");
 
     Redirect::to("/")
 }
@@ -138,7 +154,7 @@ async fn post_todo(
     Json(payload): Json<TodoInput>,
     Extension(pool): Extension<PgPool>
 ) -> Json<Vec<Todo>> {
-    let todo = Todo { id: 0, text: payload.todo };
+    let todo = Todo { id: 0, text: payload.todo, done: false};
 
     if todo.text.len() > 140 {
         println!("Todo too long: {}", todo.text);
@@ -149,6 +165,23 @@ async fn post_todo(
     todo.create(&pool).await;
 
     println!("Todo added via POST /todos");
+
+    return Json(Todo::get_all(&pool).await);
+}
+
+async fn put_todo(
+    Json(todo): Json<Todo>,
+    Extension(pool): Extension<PgPool>
+) -> Json<Vec<Todo>> {
+    if todo.text.len() > 140 {
+        println!("Todo too long: {}", todo.text);
+
+        return Json(Todo::get_all(&pool).await);
+    }
+
+    todo.update(&pool).await;
+
+    println!("Todo updated via PUT /todos");
 
     return Json(Todo::get_all(&pool).await);
 }

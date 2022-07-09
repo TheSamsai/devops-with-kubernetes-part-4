@@ -12,7 +12,17 @@
 
    <ul>
        {% for todo in todos -%}
-       <li>{{ todo.text }}</li>
+       <li>
+           {% if todo.done %}
+           DONE: 
+           {% else %}
+           TODO: 
+           {% endif %}
+           {{ todo.text }}
+            <form action="/mark/{{ todo.id }}" method="post">
+                <input type="submit" name="upvote" value="Toggle status" />
+            </form>
+       </li>
        {%- endfor %}
    </ul>
   </body>
