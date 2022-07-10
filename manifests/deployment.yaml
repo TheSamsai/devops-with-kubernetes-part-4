@@ -49,7 +49,7 @@ spec:
                 name: postgres-password
                 key: POSTGRES_PASSWORD
           - name: NATS_URL
-            value: nats://my-nats:4222
+            value: nats://my-nats.default.svc.cluster.local:4222
           readinessProbe:
             initialDelaySeconds: 10
             periodSeconds: 5
@@ -70,7 +70,7 @@ spec:
               memory: "50Mi"
           env:
           - name: NATS_URL
-            value: nats://my-nats:4222
+            value: nats://my-nats.default.svc.cluster.local:4222
           - name: WEBHOOK_URL
             value: https://nats.requestcatcher.com/test
           readinessProbe:
