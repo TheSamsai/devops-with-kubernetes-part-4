@@ -73,6 +73,7 @@ jobs:
 
       # Update manifests
       - name: Update yamls
+        working-directory: manifests
         run: |-
           kustomize edit set namespace ${GITHUB_REF#refs/heads/}
           kustomize edit set image gcr.io/PROJECT/BACKEND=gcr.io/$PROJECT_ID/$BACKEND_IMAGE:${GITHUB_REF#refs/heads/}-$GITHUB_SHA
