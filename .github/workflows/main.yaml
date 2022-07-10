@@ -2,6 +2,8 @@ name: Release application
 
 on:
   push:
+    branches:
+      - master
 
 env:
   PROJECT_ID: ${{ secrets.GKE_PROJECT }}
@@ -68,15 +70,19 @@ jobs:
       - name: Populate .env.secrets
         run: |-
           echo "$POSTGRES_PASSWORD" > .env.secret
-      # Deploy the Docker image to the GKE cluster
-      - name: Deploy
+
+      # Update manifests
+      - name: Update yamls
         run: |-
-          kubectl create namespace ${GITHUB_REF#refs/heads/} || true
-          kubectl config set-context --current --namespace=${GITHUB_REF#refs/heads/}
           kustomize edit set namespace ${GITHUB_REF#refs/heads/}
           kustomize edit set image gcr.io/PROJECT/BACKEND=gcr.io/$PROJECT_ID/$BACKEND_IMAGE:${GITHUB_REF#refs/heads/}-$GITHUB_SHA
           kustomize edit set image gcr.io/PROJECT/DAILY=gcr.io/$PROJECT_ID/$DAILY_IMAGE:${GITHUB_REF#refs/heads/}-$GITHUB_SHA
           kustomize edit set image gcr.io/PROJECT/BROADCASTER=gcr.io/$PROJECT_ID/$BROADCASTER_IMAGE:${GITHUB_REF#refs/heads/}-$GITHUB_SHA
-          kustomize build . | kubectl apply -f -
-          kubectl rollout status deployment ${BACKEND_IMAGE}-dep
-          kubectl get services -o wide
+
+      # Commit and push
+      - uses: EndBug/add-and-commit@v7
+        with:
+          add: 'kustomization.yaml'
+          message: New version release for gitops-app ${{ github.sha }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
