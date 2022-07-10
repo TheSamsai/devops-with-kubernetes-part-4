@@ -30,7 +30,7 @@ spec:
           image: gcr.io/PROJECT/BACKEND
           resources:
             limits:
-              cpu: "150m"
+              cpu: "10m"
               memory: "50Mi"
           volumeMounts:
           - name: image-volume
@@ -66,22 +66,10 @@ spec:
           image: gcr.io/PROJECT/BROADCASTER
           resources:
             limits:
-              cpu: "150m"
+              cpu: "10m"
               memory: "50Mi"
           env:
           - name: NATS_URL
             value: nats://my-nats.default.svc.cluster.local:4222
           - name: WEBHOOK_URL
             value: https://nats.requestcatcher.com/test
-          readinessProbe:
-            initialDelaySeconds: 10
-            periodSeconds: 5
-            httpGet:
-               path: /health
-               port: 3000
-          livenessProbe:
-            initialDelaySeconds: 20
-            periodSeconds: 5
-            httpGet:
-               path: /health
-               port: 3000
