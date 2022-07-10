@@ -48,6 +48,31 @@ spec:
               secretKeyRef:
                 name: postgres-password
                 key: POSTGRES_PASSWORD
+          - name: NATS_URL
+            value: nats://my-nats:4222
+          readinessProbe:
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            httpGet:
+               path: /health
+               port: 3000
+          livenessProbe:
+            initialDelaySeconds: 20
+            periodSeconds: 5
+            httpGet:
+               path: /health
+               port: 3000
+        - name: broadcaster
+          image: gcr.io/PROJECT/BROADCASTER
+          resources:
+            limits:
+              cpu: "150m"
+              memory: "50Mi"
+          env:
+          - name: NATS_URL
+            value: nats://my-nats:4222
+          - name: WEBHOOK_URL
+            value: https://nats.requestcatcher.com/test
           readinessProbe:
             initialDelaySeconds: 10
             periodSeconds: 5

@@ -5,6 +5,7 @@ use axum::{
     Router, response::{IntoResponse, Html, Redirect}, http::StatusCode, Extension, extract::{Form, Path}, Json,
 };
 
+use nats::Connection;
 use serde::Deserialize;
 use tower_http::services::ServeFile;
 
@@ -41,6 +42,9 @@ async fn main() {
 
     initialize_database(&pool).await;
 
+    let nats_url = std::env::var("NATS_URL").unwrap_or(String::from("nats://localhost:4222"));
+    let nats_client = nats::connect(nats_url).expect("Failed to connect to NATS");
+
     let tera = match Tera::new("templates/**/*") {
         Ok(t) => t,
         Err(e) => {
@@ -60,6 +64,7 @@ async fn main() {
         .layer(Extension(image_storage))
         .layer(Extension(image_age))
         .layer(Extension(pool))
+        .layer(Extension(nats_client))
         .layer(Extension(tera));
 
     let addr = SocketAddr::from(([0,0,0,0], port));
@@ -111,7 +116,8 @@ struct TodoInput {
 
 async fn post_todo_form(
     Form(input): Form<TodoInput>,
-    Extension(pool): Extension<PgPool>
+    Extension(pool): Extension<PgPool>,
+    Extension(nats_client): Extension<Connection>
 ) -> Redirect {
     let todo = Todo { id: 0, text: input.todo, done: false };
 
@@ -123,6 +129,8 @@ async fn post_todo_form(
 
     todo.create(&pool).await;
 
+    nats_client.publish("todo", "Todo was created");
+
     println!("Todo added via form");
 
     Redirect::to("/")
@@ -130,11 +138,14 @@ async fn post_todo_form(
 
 async fn toggle_todo_status(
     Path(todo_id): Path<i64>,
-    Extension(pool): Extension<PgPool>
+    Extension(pool): Extension<PgPool>,
+    Extension(nats_client): Extension<Connection>
 ) -> Redirect {
     if let Some(mut todo) = Todo::get_by_id(&pool, todo_id).await {
         todo.done = !todo.done;
         todo.update(&pool).await;
+
+        nats_client.publish("todo", "Todo was updated");
     }
 
     println!("Todo status toggled via form");
@@ -152,7 +163,8 @@ async fn get_todos(
 
 async fn post_todo(
     Json(payload): Json<TodoInput>,
-    Extension(pool): Extension<PgPool>
+    Extension(pool): Extension<PgPool>,
+    Extension(nats_client): Extension<Connection>
 ) -> Json<Vec<Todo>> {
     let todo = Todo { id: 0, text: payload.todo, done: false};
 
@@ -164,6 +176,8 @@ async fn post_todo(
 
     todo.create(&pool).await;
 
+    nats_client.publish("todo", "Todo was created");
+
     println!("Todo added via POST /todos");
 
     return Json(Todo::get_all(&pool).await);
@@ -171,7 +185,8 @@ async fn post_todo(
 
 async fn put_todo(
     Json(todo): Json<Todo>,
-    Extension(pool): Extension<PgPool>
+    Extension(pool): Extension<PgPool>,
+    Extension(nats_client): Extension<Connection>
 ) -> Json<Vec<Todo>> {
     if todo.text.len() > 140 {
         println!("Todo too long: {}", todo.text);
@@ -180,6 +195,8 @@ async fn put_todo(
     }
 
     todo.update(&pool).await;
+
+    nats_client.publish("todo", "Todo was updated");
 
     println!("Todo updated via PUT /todos");
 
